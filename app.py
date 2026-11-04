@@ -1,505 +1,260 @@
-<!DOCTYPE html>
-<html lang="id" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EarnApp Multi Account Monitoring</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { background-color: #181825; color: #cdd6f4; font-family: 'Segoe UI', system-ui, sans-serif; }
-        .card { background-color: #1e1e2e; border: 1px solid #313244; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.25); }
-        .stat-pill { background-color: #313244; border-radius: 8px; height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; }
-        .chart-box { background-color: #181825; border: 1px solid #313244; border-radius: 12px; padding: 12px; height: 220px; position: relative; }
-        .table-container { max-height: 340px; overflow-y: auto; border-radius: 10px; border: 1px solid #313244; }
-        .table-dark { --bs-table-bg: #181825; --bs-table-striped-bg: #1e1e2e; margin-bottom: 0; }
-        .ip-chip { display: inline-block; margin: 2px 4px 2px 0; font-family: monospace; font-size: 0.85rem; }
-        .badge-online { background-color: rgba(166, 227, 161, 0.15); color: #a6e3a1; border: 1px solid #a6e3a1; }
-        .badge-offline { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; }
-        .badge-blocked { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
-        .btn-withdraw { background-color: #a6e3a1; color: #11111b; font-weight: 600; border: none; }
-        .btn-withdraw:hover { background-color: #94e2d5; color: #11111b; }
-        .btn-withdraw-low { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; }
-        .btn-withdraw-low:hover { background-color: #45475a; color: #ffffff; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #181825; }
-        ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
-    </style>
-</head>
-<body class="p-3 p-md-4">
-    <div class="container-fluid">
-        <!-- HEADER UTAMA -->
-        <div class="card p-3 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                <div class="d-flex align-items-center gap-2">
-                    <img src="https://i.ibb.co.com/wZtz8N8D/EAIcon.png" onerror="this.src='/static/EAIcon.png'; this.onerror=null;" alt="Logo" style="width: 40px; height: 40px; object-fit: contain;">
-                    <h4 class="mb-0 fw-bold text-light">EarnApp Multi Account Monitoring</h4>
-                </div>
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+import sqlite3
+import requests
+import re
+import datetime
 
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <div class="stat-pill">
-                        <span data-i18n="totalBalance">💰 Total Balance:</span>
-                        <strong class="text-success" style="font-size: 1.05rem;">$<span id="globalBalance">0.00</span></strong>
-                    </div>
-                    <div class="stat-pill">
-                        <span data-i18n="totalLifetime">🏆 Total Lifetime:</span>
-                        <strong class="text-warning" style="font-size: 1.05rem;">$<span id="globalLifetime">0.00</span></strong>
-                    </div>
-                    <div class="stat-pill">
-                        <span data-i18n="globalNodes">📡 Global Nodes:</span>
-                        <strong class="text-info" style="font-size: 1.05rem;"><span id="globalOnline">0</span> / <span id="globalTotal">0</span></strong>
-                    </div>
-                    <button id="btnManageAcc" class="btn btn-outline-light btn-sm px-3" style="height: 38px; border-radius: 8px; display: inline-flex; align-items: center;" type="button" data-bs-toggle="collapse" data-bs-target="#accountManager">
-                        ⚙️ Kelola Akun ({{ accounts|length }})
-                    </button>
-                    
-                    <div class="bg-dark px-2" style="height: 38px; border-radius: 8px; border: 1px solid #313244; display: inline-flex; align-items: center;">
-                        <span class="text-secondary me-1">🌐</span>
-                        <select id="langSelector" class="form-select form-select-sm border-0" style="width: auto; background-color: transparent; color: #cdd6f4; font-size: 0.85rem; padding: 0 1.5rem 0 0.2rem; cursor: pointer; box-shadow: none;" onchange="changeLanguage()">
-                            <option value="id" style="background-color: #1e1e2e;">ID 🇮🇩</option>
-                            <option value="en" style="background-color: #1e1e2e;">EN 🇺🇸</option>
-                        </select>
-                    </div>
+app = Flask(__name__)
+DB_FILE = "/root/earnapp-web/earnapp.db"
 
-                    <div class="bg-dark px-2" style="height: 38px; border-radius: 8px; border: 1px solid #313244; display: inline-flex; align-items: center;">
-                        <small class="text-secondary me-1" data-i18n="autoRef">Auto-refresh:</small>
-                        <select id="refreshInterval" class="form-select form-select-sm border-0" style="width: auto; background-color: transparent; color: #cdd6f4; font-size: 0.85rem; padding: 0 1.5rem 0 0.2rem; cursor: pointer; box-shadow: none;" onchange="updateRefreshInterval()">
-                            <option value="60000" style="background-color: #1e1e2e;" data-i18n="min1">1 Menit</option>
-                            <option value="120000" selected style="background-color: #1e1e2e;" data-i18n="min2">2 Menit</option>
-                            <option value="300000" style="background-color: #1e1e2e;" data-i18n="min5">5 Menit</option>
-                            <option value="600000" style="background-color: #1e1e2e;" data-i18n="min10">10 Menit</option>
-                            <option value="0" style="background-color: #1e1e2e;" data-i18n="manual">Manual</option>
-                        </select>
-                    </div>
+def init_db():
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, cookie TEXT)')
+        conn.execute('CREATE TABLE IF NOT EXISTS history (account_id INTEGER, date TEXT, balance REAL, lifetime REAL, PRIMARY KEY (account_id, date))')
+init_db()
 
-                    <button class="btn btn-primary btn-sm px-3" style="height: 38px; border-radius: 8px; display: inline-flex; align-items: center;" onclick="fetchStats()">
-                        <span data-i18n="refresh">🔄 Refresh</span>
-                    </button>
-                </div>
-            </div>
+def format_waktu(raw_val):
+    try:
+        if raw_val is None: return "0m"
+        s = int(raw_val) // 1000
+        d = s // 86400
+        h = (s % 86400) // 3600
+        m = (s % 3600) // 60
+        if d > 0: return f"{d}d {h}h"
+        if h > 0: return f"{h}h {m}m"
+        return f"{m}m"
+    except:
+        return "0m"
 
-            <!-- MENU KELOLA AKUN -->
-            <div class="collapse mt-3 pt-3 border-top border-secondary" id="accountManager">
-                <div class="row g-3">
-                    <div class="col-md-5">
-                        <div class="p-3 rounded-3" style="background-color: #181825;">
-                            <h6 class="mb-3" data-i18n="addAccTitle">➕ Tambah Akun EarnApp Baru</h6>
-                            <form action="/add_account" method="POST">
-                                <input type="text" name="name" id="inputAccName" class="form-control form-control-sm mb-2" placeholder="🏷️ Nama Akun (Misal: OneforAll / Wifi)" required>
-                                <textarea name="cookie" id="inputCookie" class="form-control form-control-sm mb-2" rows="2" placeholder="🍪 Paste Full Cookie EarnApp di sini..." required></textarea>
-                                <button type="submit" class="btn btn-sm btn-success w-100" data-i18n="saveAccBtn">💾 Simpan Akun</button>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="col-md-7">
-                        <div class="p-3 rounded-3 h-100" style="background-color: #181825;">
-                            <h6 class="mb-3" data-i18n="regAccTitle">📋 Daftar Akun Terdaftar</h6>
-                            <div class="table-responsive" style="max-height: 145px;">
-                                <table class="table table-sm table-dark align-middle">
-                                    <thead><tr><th>#</th><th data-i18n="tblAccName">Nama Akun</th><th class="text-end" data-i18n="tblAction">Aksi</th></tr></thead>
-                                    <tbody>
-                                        {% for acc in accounts %}
-                                        <tr>
-                                            <td>{{ acc[0] }}</td>
-                                            <td><span class="fw-semibold">🦊 {{ acc[1] }}</span></td>
-                                            <td class="text-end">
-                                                <a href="/delete_account/{{ acc[0] }}" class="btn btn-sm btn-outline-danger py-0" data-i18n="btnDelete">🗑️ Hapus</a>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+def natural_key(text):
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', str(text))]
 
-        <!-- KONTEN DASHBOARD PER AKUN -->
-        <div id="dashboardContent" class="row g-4">
-            <div class="col-12 text-center py-5">
-                <div class="spinner-border text-info mb-2" role="status"></div>
-                <p class="text-secondary" id="loadingText">⏳ Sedang memanen data dari semua akun EarnApp...</p>
-            </div>
-        </div>
-    </div>
+def get_headers(cookie):
+    csrf_match = re.search(r'xsrf-token=([^;]+)', cookie)
+    csrf_token = csrf_match.group(1) if csrf_match else ""
+    return {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": "https://earnapp.com",
+        "Referer": "https://earnapp.com/dashboard/me/passive-income",
+        "xsrf-token": csrf_token,
+        "Cookie": cookie
+    }
 
-    <!-- MODAL WITHDRAW -->
-    <div class="modal fade" id="withdrawModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="background-color: #1e1e2e; border: 1px solid #45475a; border-radius: 14px;">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title fw-bold text-light" data-i18n="wdTitle">💸 Pencairan Dana (Withdraw)</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="wdAccId">
-                    <div class="p-3 rounded-3 mb-3 d-flex justify-content-between align-items-center" style="background-color: #181825; border: 1px solid #313244;">
-                        <div>
-                            <small class="text-secondary d-block" data-i18n="wdSelAcc">Akun Terpilih</small>
-                            <strong class="fs-5 text-info" id="wdAccName">-</strong>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-secondary d-block" data-i18n="wdBal">Saldo Tersedia</small>
-                            <strong class="fs-4 text-success" id="wdAccBalance">$0.00</strong>
-                        </div>
-                    </div>
+@app.route('/')
+def index():
+    with sqlite3.connect(DB_FILE) as conn:
+        accounts = conn.execute('SELECT id, name FROM accounts').fetchall()
+    return render_template('index.html', accounts=accounts)
 
-                    <div id="wdMinWarning" class="alert alert-warning py-2 small d-none" data-i18n="wdMinWarn">
-                        ⚠️ Saldo akun ini masih di bawah batas minimal penarikan EarnApp (<strong>$2.50</strong>).
-                    </div>
+@app.route('/add_account', methods=['POST'])
+def add_account():
+    name = request.form.get('name')
+    cookie = request.form.get('cookie')
+    if name and cookie:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute('INSERT INTO accounts (name, cookie) VALUES (?, ?)', (name.strip(), cookie.strip()))
+    return redirect(url_for('index'))
 
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary" data-i18n="wdMethod">📧 Metode Pencairan</label>
-                        <select id="wdMethod" class="form-select form-select-sm" style="background-color: #181825; border-color: #313244;">
-                            <option value="paypal.com">💳 PayPal (paypal.com)</option>
-                        </select>
-                    </div>
+@app.route('/delete_account/<int:acc_id>')
+def delete_account(acc_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute('DELETE FROM accounts WHERE id = ?', (acc_id,))
+        conn.execute('DELETE FROM history WHERE account_id = ?', (acc_id,))
+    return redirect(url_for('index'))
 
-                    <div class="mb-3">
-                        <label class="form-label small text-secondary" data-i18n="wdEmailLbl">📩 Email PayPal Tujuan</label>
-                        <input type="email" id="wdEmail" class="form-control" style="background-color: #181825; border-color: #313244;" placeholder="contoh: email_kamu@gmail.com" required>
-                        <small class="text-secondary" style="font-size: 0.75rem;" data-i18n="wdEmailNote">*Email otomatis tersimpan di browser untuk penarikan berikutnya.</small>
-                    </div>
+@app.route('/api/withdraw', methods=['POST'])
+def api_withdraw():
+    data = request.get_json() or {}
+    acc_id = data.get('acc_id')
+    email = str(data.get('email', '')).strip()
+    payment_method = str(data.get('payment_method', 'paypal.com')).strip()
 
-                    <div id="wdStatusAlert" class="alert d-none mb-0 py-2 small"></div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" data-i18n="wdCancel">Batal</button>
-                    <button type="button" id="wdSubmitBtn" onclick="submitWithdraw()" class="btn btn-sm btn-success px-4 fw-bold">
-                        🚀 <span data-i18n="wdSubmit">Cairkan Sekarang</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    if not acc_id or not email:
+        return jsonify({"success": False, "message": "ID Akun dan Email PayPal wajib diisi."}), 400
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const i18n = {
-            id: {
-                totalBalance: "💰 Total Balance:", totalLifetime: "🏆 Total Lifetime:", globalNodes: "📡 Global Nodes:", manageAcc: "⚙️ Kelola Akun ({{ accounts|length }})",
-                autoRef: "Auto-refresh:", min1: "1 Menit", min2: "2 Menit", min5: "5 Menit", min10: "10 Menit", manual: "Manual", refresh: "🔄 Refresh",
-                addAccTitle: "➕ Tambah Akun EarnApp Baru", accNamePlaceholder: "🏷️ Nama Akun (Misal: OneforAll / Wifi)", cookiePlaceholder: "🍪 Paste Full Cookie EarnApp di sini...", saveAccBtn: "💾 Simpan Akun",
-                regAccTitle: "📋 Daftar Akun Terdaftar", tblAccName: "Nama Akun", tblAction: "Aksi", btnDelete: "🗑️ Hapus",
-                loadingText: "⏳ Sedang memanen data dari semua akun EarnApp...",
-                wdTitle: "💸 Pencairan Dana (Withdraw)", wdSelAcc: "Akun Terpilih", wdBal: "Saldo Tersedia",
-                wdMinWarn: "⚠️ Saldo akun ini masih di bawah batas minimal penarikan EarnApp (<strong>$2.50</strong>).",
-                wdMethod: "📧 Metode Pencairan", wdEmailLbl: "📩 Email PayPal Tujuan", wdEmailPlace: "contoh: email_kamu@gmail.com",
-                wdEmailNote: "*Email otomatis tersimpan di browser untuk penarikan berikutnya.", wdCancel: "Batal", wdSubmit: "Cairkan Sekarang",
-                txtErr: "⚠️ Error:", txtUsage: "⏱️ Usage:", txtLifetime: "🏆 Lifetime:", btnWd: "💸 Withdraw",
-                chartGlobal: "📈 Tren Global (7 Hari Terakhir)", chartTop: "🏆 Top Node", chartHist: "📈 Riwayat Saldo (30 Hari)", chartDays: "Hari Online", chartHours: "Jam Kerja",
-                tblNode: "🖥️ Node", tblCountry: "🌍 Negara", tblEarned: "💵 Earned", tblStatus: "📡 Status", txtTot: "Tot:", txtTotal: "Total:",
-                errEmailReq: "❌ Masukkan alamat email PayPal terlebih dahulu!", msgProcess: "⏳ Memproses...",
-                msgWdWait: "⏳ Menghubungi server EarnApp untuk pencairan...", errWdFail: "❌ Gagal menghubungi server aplikasi.",
-                filterAll: "Semua", filterOnline: "Online", filterOffline: "Offline", filterBlocked: "Blocked", btnExport: "📥 CSV"
-            },
-            en: {
-                totalBalance: "💰 Total Balance:", totalLifetime: "🏆 Total Lifetime:", globalNodes: "📡 Global Nodes:", manageAcc: "⚙️ Manage Accounts ({{ accounts|length }})",
-                autoRef: "Auto-refresh:", min1: "1 Minute", min2: "2 Minutes", min5: "5 Minutes", min10: "10 Minutes", manual: "Manual", refresh: "🔄 Refresh",
-                addAccTitle: "➕ Add New EarnApp Account", accNamePlaceholder: "🏷️ Account Name (e.g., Main / Wifi)", cookiePlaceholder: "🍪 Paste Full EarnApp Cookie here...", saveAccBtn: "💾 Save Account",
-                regAccTitle: "📋 Registered Accounts", tblAccName: "Account Name", tblAction: "Action", btnDelete: "🗑️ Delete",
-                loadingText: "⏳ Harvesting data from all EarnApp accounts...",
-                wdTitle: "💸 Withdraw Funds", wdSelAcc: "Selected Account", wdBal: "Available Balance",
-                wdMinWarn: "⚠️ This account's balance is below the minimum withdrawal limit (<strong>$2.50</strong>).",
-                wdMethod: "📧 Withdrawal Method", wdEmailLbl: "📩 Target PayPal Email", wdEmailPlace: "e.g.: your_email@gmail.com",
-                wdEmailNote: "*Email is automatically saved in browser for future withdrawals.", wdCancel: "Cancel", wdSubmit: "Withdraw Now",
-                txtErr: "⚠️ Error:", txtUsage: "⏱️ Usage:", txtLifetime: "🏆 Lifetime:", btnWd: "💸 Withdraw",
-                chartGlobal: "📈 Global Trend (Last 7 Days)", chartTop: "🏆 Top Node", chartHist: "📈 Balance History (30 Days)", chartDays: "Days Online", chartHours: "Hours Worked",
-                tblNode: "🖥️ Node", tblCountry: "🌍 Country", tblEarned: "💵 Earned", tblStatus: "📡 Status", txtTot: "Tot:", txtTotal: "Total:",
-                errEmailReq: "❌ Please enter your PayPal email first!", msgProcess: "⏳ Processing...",
-                msgWdWait: "⏳ Contacting EarnApp server for withdrawal...", errWdFail: "❌ Failed to contact application server.",
-                filterAll: "All", filterOnline: "Online", filterOffline: "Offline", filterBlocked: "Blocked", btnExport: "📥 CSV"
-            }
-        };
+    with sqlite3.connect(DB_FILE) as conn:
+        row = conn.execute('SELECT name, cookie FROM accounts WHERE id = ?', (acc_id,)).fetchone()
 
-        let currentLang = localStorage.getItem('earnapp_lang') || 'id';
-        let chartInstances = {};
-        let withdrawModalInstance = null;
-        let refreshTimer = null;
-        let T = i18n[currentLang];
-        window.appData = [];
+    if not row:
+        return jsonify({"success": False, "message": "Akun tidak ditemukan di database."}), 404
 
-        document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('langSelector').value = currentLang;
-            applyTranslations();
+    acc_name, cookie = row
+    headers = get_headers(cookie)
+
+    try:
+        res_money = requests.get("https://earnapp.com/dashboard/api/money?appid=earnapp", headers=headers, timeout=12).json()
+        balance = float(res_money.get('balance', 0) or 0)
+
+        if balance < 2.5:
+            return jsonify({"success": False, "message": f"Saldo akun {acc_name} saat ini ${balance:.2f} (Minimal $2.50)."}), 400
+
+        payload = {"to": email, "payment_method": payment_method}
+        res_wd = requests.post("https://earnapp.com/dashboard/api/redeem?appid=earnapp", headers=headers, json=payload, timeout=15)
+
+        if res_wd.status_code == 200:
+            return jsonify({"success": True, "message": f"Berhasil! Penarikan ${balance:.2f} sedang diproses ke {email}."})
+        else:
+            err_detail = res_wd.text[:150] if res_wd.text else f"HTTP {res_wd.status_code}"
+            return jsonify({"success": False, "message": f"Penarikan ditolak oleh server EarnApp ({err_detail})."}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Kesalahan jaringan: {str(e)}"}), 500
+
+@app.route('/api/stats')
+def api_stats():
+    with sqlite3.connect(DB_FILE) as conn:
+        accounts = conn.execute('SELECT id, name, cookie FROM accounts').fetchall()
+    
+    dashboard_data = {
+        "total_balance": 0, "total_lifetime": 0, "total_online": 0, "total_nodes": 0, "accounts": []
+    }
+    
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    for acc in accounts:
+        acc_id, name, cookie = acc
+        headers = get_headers(cookie)
+        
+        try:
+            res_money = requests.get("https://earnapp.com/dashboard/api/money?appid=earnapp", headers=headers, timeout=12).json()
+            balance = float(res_money.get('balance', 0) or 0)
+            lifetime = float(res_money.get('earnings_total', res_money.get('total_earnings', 0)) or 0)
             
-            withdrawModalInstance = new bootstrap.Modal(document.getElementById('withdrawModal'));
-            const savedEmail = localStorage.getItem('earnapp_paypal_email');
-            if (savedEmail) { document.getElementById('wdEmail').value = savedEmail; }
-            startRefreshTimer();
-        });
-
-        function changeLanguage() {
-            currentLang = document.getElementById('langSelector').value;
-            localStorage.setItem('earnapp_lang', currentLang);
-            T = i18n[currentLang];
-            applyTranslations();
-            fetchStats();
-        }
-
-        function applyTranslations() {
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if (T[key]) el.innerHTML = T[key];
-            });
-            document.getElementById('btnManageAcc').innerHTML = T.manageAcc;
-            document.getElementById('inputAccName').placeholder = T.accNamePlaceholder;
-            document.getElementById('inputCookie').placeholder = T.cookiePlaceholder;
-            document.getElementById('wdEmail').placeholder = T.wdEmailPlace;
-            document.getElementById('loadingText').innerText = T.loadingText;
-        }
-
-        function updateRefreshInterval() { startRefreshTimer(); }
-        function startRefreshTimer() {
-            if (refreshTimer) clearInterval(refreshTimer);
-            const intervalVal = parseInt(document.getElementById('refreshInterval').value);
-            if (intervalVal > 0) refreshTimer = setInterval(fetchStats, intervalVal);
-        }
-
-        function openWithdrawModal(accId, accName, balance) {
-            document.getElementById('wdAccId').value = accId;
-            document.getElementById('wdAccName').innerText = '🦊 ' + accName;
-            document.getElementById('wdAccBalance').innerText = '$' + balance.toFixed(2);
-            const statusAlert = document.getElementById('wdStatusAlert');
-            statusAlert.className = 'alert d-none mb-0 py-2 small';
-            statusAlert.innerText = '';
-            const minWarn = document.getElementById('wdMinWarning');
-            const submitBtn = document.getElementById('wdSubmitBtn');
-            if (balance < 2.5) {
-                minWarn.classList.remove('d-none');
-                submitBtn.disabled = true;
-            } else {
-                minWarn.classList.add('d-none');
-                submitBtn.disabled = false;
-            }
-            withdrawModalInstance.show();
-        }
-
-        async function submitWithdraw() {
-            const accId = document.getElementById('wdAccId').value;
-            const email = document.getElementById('wdEmail').value.trim();
-            const method = document.getElementById('wdMethod').value;
-            const statusAlert = document.getElementById('wdStatusAlert');
-            const submitBtn = document.getElementById('wdSubmitBtn');
-
-            if (!email) {
-                statusAlert.className = 'alert alert-danger mb-0 py-2 small';
-                statusAlert.innerText = T.errEmailReq; return;
-            }
-            localStorage.setItem('earnapp_paypal_email', email);
-            submitBtn.disabled = true; submitBtn.innerHTML = `🚀 ${T.msgProcess}`;
-            statusAlert.className = 'alert alert-info mb-0 py-2 small'; statusAlert.innerText = T.msgWdWait;
-
-            try {
-                const res = await fetch('/api/withdraw', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ acc_id: accId, email: email, payment_method: method })
-                });
-                const result = await res.json();
-                if (result.success) {
-                    statusAlert.className = 'alert alert-success mb-0 py-2 small';
-                    statusAlert.innerText = '✅ ' + result.message; fetchStats();
-                } else {
-                    statusAlert.className = 'alert alert-danger mb-0 py-2 small';
-                    statusAlert.innerText = '❌ ' + result.message; submitBtn.disabled = false;
-                }
-            } catch (err) {
-                statusAlert.className = 'alert alert-danger mb-0 py-2 small';
-                statusAlert.innerText = T.errWdFail; submitBtn.disabled = false;
-            } finally { submitBtn.innerHTML = `🚀 ${T.wdSubmit}`; }
-        }
-
-        function filterNodes(accId, status) {
-            document.querySelectorAll(`.btn-filter-${accId}`).forEach(b => {
-                b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary');
-            });
-            document.getElementById(`btnFilter_${accId}_${status}`).classList.remove('btn-outline-secondary');
-            document.getElementById(`btnFilter_${accId}_${status}`).classList.add('btn-primary');
+            dashboard_data["total_balance"] += balance
+            dashboard_data["total_lifetime"] += lifetime
             
-            const rows = document.querySelectorAll(`.row-node-${accId}`);
-            rows.forEach(row => {
-                if (status === 'all' || row.dataset.status === status) row.style.display = '';
-                else row.style.display = 'none';
-            });
-        }
-
-        function exportCSV(accId) {
-            const acc = window.appData.find(a => a.id === accId);
-            if (!acc) return;
+            with sqlite3.connect(DB_FILE) as conn_hist:
+                conn_hist.execute('INSERT OR REPLACE INTO history (account_id, date, balance, lifetime) VALUES (?, ?, ?, ?)', (acc_id, current_date, balance, lifetime))
+                hist_rows = conn_hist.execute('SELECT date, balance FROM history WHERE account_id = ? ORDER BY date ASC LIMIT 30', (acc_id,)).fetchall()
             
-            let csv = 'Node Name,Country,IP Address,Usage (Current),Total Usage,Earned (Current $),Total Earned ($),Status\n';
-            acc.devices.forEach(d => {
-                const ips = d.ips.join(' | ');
-                csv += `"${d.name}","${d.country}","${ips}","${d.uptime}","${d.total_uptime}","${d.earned}","${d.earned_total}","${d.status.toUpperCase()}"\n`;
-            });
-            
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `EarnApp_Nodes_${acc.name.replace(/[^a-z0-9]/gi, '_')}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+            chart_history = {"labels": [], "values": []}
+            for r in hist_rows:
+                chart_history["labels"].append(r[0][-5:]) 
+                chart_history["values"].append(r[1])
 
-        function destroyCharts() {
-            Object.values(chartInstances).forEach(chart => chart.destroy());
-            chartInstances = {};
-        }
-
-        async function fetchStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const data = await response.json();
-                window.appData = data.accounts;
-
-                document.getElementById('globalBalance').innerText = data.total_balance.toFixed(2);
-                document.getElementById('globalLifetime').innerText = data.total_lifetime.toFixed(2);
-                document.getElementById('globalOnline').innerText = data.total_online;
-                document.getElementById('globalTotal').innerText = data.total_nodes;
+            res_devs = requests.get("https://earnapp.com/dashboard/api/devices?appid=earnapp", headers=headers, timeout=12).json()
+            if not isinstance(res_devs, list): res_devs = []
                 
-                destroyCharts(); let html = '';
+            payload_uuids = {"devices": [{"uuid": d['uuid']} for d in res_devs if isinstance(d, dict) and 'uuid' in d]}
+            res_status = {}
+            if payload_uuids["devices"]:
+                res_st_req = requests.post("https://earnapp.com/dashboard/api/device_statuses?appid=earnapp&version=1.668.241", headers=headers, json=payload_uuids, timeout=12)
+                if res_st_req.status_code == 200: res_status = res_st_req.json()
+            
+            devices_info = []
+            acc_uptime_ms = 0
+            
+            for d in res_devs:
+                if not isinstance(d, dict): continue
+                uuid = d.get('uuid')
+                
+                raw_st = res_status.get(uuid, 'offline') if isinstance(res_status, dict) else 'offline'
+                if isinstance(raw_st, list) and len(raw_st) > 0: raw_st = raw_st[0]
+                
+                st_str = str(raw_st.get('status', '')) if isinstance(raw_st, dict) else str(raw_st)
+                reason_str = str(raw_st.get('reason', '')) if isinstance(raw_st, dict) else ""
+                error_reason = str(d.get('error_reason', ''))
+                
+                # Menggabungkan teks untuk memindai status VPN dan Blocked
+                check_text = (st_str + " " + reason_str + " " + error_reason).lower()
+                
+                if "blocked" in check_text or "banned" in check_text or "vpn" in check_text or "low quality" in check_text:
+                    st = "blocked"
+                    if not error_reason: 
+                        error_reason = "IP Blocked / VPN Detected"
+                elif "online" in check_text or str(raw_st).isdigit():
+                    st = "online"
+                else:
+                    st = "offline"
 
-                data.accounts.forEach(acc => {
-                    if (acc.error) {
-                        html += `<div class="col-12"><div class="card border-danger p-3"><h5>😿 ${acc.name}</h5><p class="text-danger mb-0">${T.txtErr} ${acc.error}</p></div></div>`;
-                        return;
-                    }
-                    const warnBadge = acc.blocked_nodes > 0 ? `<span class="badge badge-blocked ms-1">⚠️ ${acc.blocked_nodes} Blocked</span>` : '';
-                    const wdBtnClass = acc.balance >= 2.5 ? 'btn-withdraw' : 'btn-withdraw-low';
-                    const safeName = acc.name.replace(/'/g, "\\'");
+                raw_ips = d.get('ips', d.get('ip', []))
+                if isinstance(raw_ips, list): clean_ips = [str(ip).strip() for ip in raw_ips if str(ip).strip()]
+                else: clean_ips = [ip.strip().strip("'\"") for ip in str(raw_ips).split(',') if ip.strip()]
 
-                    html += `
-                    <div class="col-12">
-                        <div class="card p-3 h-100">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
-                                <div>
-                                    <h5 class="mb-1 fw-bold text-info">🦊 ${acc.name}</h5>
-                                    <div class="d-flex flex-wrap gap-2 align-items-center small">
-                                        <span class="badge badge-online">🟢 ${acc.active_nodes} / ${acc.total_nodes} Online</span>
-                                        ${warnBadge}
-                                        <span class="text-secondary">${T.txtUsage} <strong class="text-light">${acc.total_usage}</strong></span>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="text-end me-3">
-                                        <div class="fs-4 fw-bold text-success">💰 $${acc.balance.toFixed(2)}</div>
-                                        <small class="text-warning">${T.txtLifetime} $${acc.lifetime.toFixed(2)}</small>
-                                    </div>
-                                    <button onclick="exportCSV(${acc.id})" class="btn btn-sm btn-outline-info rounded-3 px-3 py-2 fw-bold" title="Export Data Node">${T.btnExport}</button>
-                                    <button onclick="openWithdrawModal(${acc.id}, '${safeName}', ${acc.balance})" class="btn btn-sm ${wdBtnClass} rounded-3 px-3 py-2">${T.btnWd}</button>
-                                </div>
-                            </div>
+                uptime_raw = int(d.get('uptime', d.get('online_time', 0)) or 0)
+                tot_uptime_raw = int(d.get('total_uptime', d.get('total_online_time', 0)) or 0)
+                acc_uptime_ms += uptime_raw
 
-                            <div class="row g-2 mb-2">
-                                <div class="col-md-4">
-                                    <div class="chart-box">
-                                        <div class="small fw-semibold mb-1 text-light">${T.chartGlobal}</div>
-                                        <canvas id="chartGlobal_${acc.id}"></canvas>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="chart-box">
-                                        <div class="small fw-semibold mb-1 text-light">${T.chartHist}</div>
-                                        <canvas id="chartHist_${acc.id}"></canvas>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="chart-box">
-                                        <div class="small fw-semibold mb-1 text-light">${T.chartTop} (${acc.chart_top.date})</div>
-                                        <canvas id="chartTop_${acc.id}"></canvas>
-                                    </div>
-                                </div>
-                            </div>
+                devices_info.append({
+                    "name": str(d.get('title', d.get('name', 'Unknown'))),
+                    "earned": float(d.get('earned', d.get('amount', 0)) or 0),
+                    "earned_total": float(d.get('earned_total', d.get('total_earned', 0)) or 0),
+                    "uptime": format_waktu(uptime_raw),
+                    "total_uptime": format_waktu(tot_uptime_raw),
+                    "uptime_raw": uptime_raw,
+                    "country": str(d.get('country', 'UN')).upper(),
+                    "status": st,
+                    "error_reason": error_reason,
+                    "ips": clean_ips
+                })
 
-                            <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 mt-3">
-                                <div class="small fw-semibold text-light mb-1">${T.tblNode} List</div>
-                                <div class="btn-group btn-group-sm mb-1" role="group">
-                                    <button id="btnFilter_${acc.id}_all" onclick="filterNodes(${acc.id}, 'all')" class="btn btn-primary btn-filter-${acc.id}">${T.filterAll}</button>
-                                    <button id="btnFilter_${acc.id}_online" onclick="filterNodes(${acc.id}, 'online')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOnline}</button>
-                                    <button id="btnFilter_${acc.id}_offline" onclick="filterNodes(${acc.id}, 'offline')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOffline}</button>
-                                    <button id="btnFilter_${acc.id}_blocked" onclick="filterNodes(${acc.id}, 'blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked}</button>
-                                </div>
-                            </div>
+            devices_info.sort(key=lambda x: natural_key(x['name']))
 
-                            <div class="table-container">
-                                <table class="table table-sm table-dark table-striped align-middle">
-                                    <thead class="sticky-top" style="background-color: #11111b;">
-                                        <tr class="text-secondary small">
-                                            <th class="ps-3">${T.tblNode}</th>
-                                            <th>${T.tblCountry}</th>
-                                            <th>🌐 IP Address</th>
-                                            <th>${T.txtUsage}</th>
-                                            <th>${T.tblEarned}</th>
-                                            <th class="text-center pe-3">${T.tblStatus}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tbody_${acc.id}">`;
+            chart_global = {"labels": [], "values": []}
+            chart_top = {"labels": [], "values": [], "date": "-"}
+            
+            try:
+                res_usage = requests.get("https://earnapp.com/dashboard/api/usage?appid=earnapp&step=daily", headers=headers, timeout=12)
+                if res_usage.status_code == 200:
+                    usage_data = res_usage.json()
+                    if isinstance(usage_data, list) and len(usage_data) > 0:
+                        agregasi_harian = {}
+                        all_dates = set()
+                        for p in usage_data:
+                            if isinstance(p, dict) and "data" in p:
+                                for tgl, durasi in p.get("data", {}).items():
+                                    all_dates.add(tgl)
+                                    val = int(durasi) if durasi is not None else 0
+                                    agregasi_harian[tgl] = agregasi_harian.get(tgl, 0) + val
+                        
+                        if agregasi_harian:
+                            tgl_tersortir = sorted(agregasi_harian.keys())[-7:]
+                            chart_global["labels"] = [t[5:] for t in tgl_tersortir]
+                            chart_global["values"] = [round(agregasi_harian[t] / 86400000, 2) for t in tgl_tersortir]
+                        
+                        if all_dates:
+                            latest_date = sorted(list(all_dates))[-1]
+                            chart_top["date"] = latest_date
+                            node_daily = []
+                            for p in usage_data:
+                                if isinstance(p, dict):
+                                    nm = str(p.get("title", p.get("name", "Unknown")))
+                                    raw_pakai = p.get("data", {}).get(latest_date, 0) if isinstance(p.get("data"), dict) else 0
+                                    pakai = int(raw_pakai) if raw_pakai is not None else 0
+                                    node_daily.append((nm, pakai))
+                            node_daily.sort(key=lambda x: x[1], reverse=True)
+                            top_10 = node_daily[:10]
+                            chart_top["labels"] = [n[0][:12] for n in top_10]
+                            chart_top["values"] = [round(n[1] / 3600000, 1) for n in top_10]
+            except Exception: pass
 
-                    acc.devices.forEach(dev => {
-                        let statusBadge = '';
-                        if (dev.status === 'online') statusBadge = `<span class="badge badge-online">🟢 ONLINE</span>`;
-                        else if (dev.status === 'blocked') statusBadge = `<span class="badge badge-blocked" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ BLOCKED</span>`;
-                        else statusBadge = `<span class="badge badge-offline">🔴 OFFLINE</span>`;
+            active_count = sum(1 for x in devices_info if x['status'] == 'online')
+            blocked_count = sum(1 for x in devices_info if x['status'] == 'blocked')
+            total_count = len(devices_info)
 
-                        const ipHtml = dev.ips.length > 0 ? dev.ips.map(ip => `<span class="ip-chip">${ip}</span>`).join(' ') : '<span class="text-muted small">-</span>';
-                        html += `
-                        <tr class="row-node-${acc.id}" data-status="${dev.status}">
-                            <td class="ps-3 fw-semibold text-nowrap">${dev.name}</td>
-                            <td class="text-nowrap"><span class="badge bg-dark border border-secondary text-info">${dev.country}</span></td>
-                            <td>${ipHtml}</td>
-                            <td class="text-nowrap">
-                                <span class="text-info">${dev.uptime}</span>
-                                <small class="text-secondary d-block" style="font-size:0.72rem;">${T.txtTotal} ${dev.total_uptime}</small>
-                            </td>
-                            <td class="text-nowrap">
-                                <span class="fw-bold text-success">$${dev.earned.toFixed(2)}</span>
-                                <small class="text-secondary d-block" style="font-size:0.72rem;">${T.txtTot} $${dev.earned_total.toFixed(2)}</small>
-                            </td>
-                            <td class="text-center pe-3">${statusBadge}</td>
-                        </tr>`;
-                    });
-                    html += `</tbody></table></div></div></div>`;
-                });
-                document.getElementById('dashboardContent').innerHTML = html;
+            dashboard_data["total_online"] += active_count
+            dashboard_data["total_nodes"] += total_count
 
-                data.accounts.forEach(acc => {
-                    if (acc.error) return;
-                    
-                    const ctxGlobal = document.getElementById(`chartGlobal_${acc.id}`);
-                    if (ctxGlobal) {
-                        chartInstances[`global_${acc.id}`] = new Chart(ctxGlobal, {
-                            type: 'line',
-                            data: { labels: acc.chart_global.labels, datasets: [{ label: T.chartDays, data: acc.chart_global.values, borderColor: '#a6e3a1', backgroundColor: 'rgba(166, 227, 161, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }] },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, layout: { padding: { bottom: 18 } }, scales: { x: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' } }, y: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' }, beginAtZero: true } } }
-                        });
-                    }
-                    
-                    const ctxHist = document.getElementById(`chartHist_${acc.id}`);
-                    if (ctxHist) {
-                        chartInstances[`hist_${acc.id}`] = new Chart(ctxHist, {
-                            type: 'line',
-                            data: { labels: acc.chart_history.labels, datasets: [{ label: 'Balance ($)', data: acc.chart_history.values, borderColor: '#f9e2af', backgroundColor: 'rgba(249, 226, 175, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }] },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, layout: { padding: { bottom: 18 } }, scales: { x: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' } }, y: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' }, beginAtZero: false } } }
-                        });
-                    }
+            dashboard_data["accounts"].append({
+                "id": acc_id,
+                "name": name,
+                "balance": balance,
+                "lifetime": lifetime,
+                "total_usage": format_waktu(acc_uptime_ms),
+                "devices": devices_info,
+                "active_nodes": active_count,
+                "blocked_nodes": blocked_count,
+                "total_nodes": total_count,
+                "chart_global": chart_global,
+                "chart_top": chart_top,
+                "chart_history": chart_history
+            })
+        except Exception as e:
+            dashboard_data["accounts"].append({"id": acc_id, "name": name, "error": str(e)})
 
-                    const ctxTop = document.getElementById(`chartTop_${acc.id}`);
-                    if (ctxTop) {
-                        chartInstances[`top_${acc.id}`] = new Chart(ctxTop, {
-                            type: 'bar',
-                            data: { labels: acc.chart_top.labels, datasets: [{ label: T.chartHours, data: acc.chart_top.values, backgroundColor: '#89b4fa', borderRadius: 4 }] },
-                            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, layout: { padding: { bottom: 18, right: 10 } }, scales: { x: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' }, beginAtZero: true }, y: { ticks: { color: '#cdd6f4', font: { size: 10 } }, grid: { display: false } } } }
-                        });
-                    }
-                });
-            } catch (error) { console.error('Error fetching stats:', error); }
-        }
-        fetchStats();
-    </script>
-</body>
-</html>
+    return jsonify(dashboard_data)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
