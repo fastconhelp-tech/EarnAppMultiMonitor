@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EarnApp Multi-Account Monitoring</title>
+    <title>EarnApp Multi Account Monitoring</title>
     <link rel="icon" href="https://i.ibb.co.com/wZtz8N8D/EAIcon.png" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17,7 +17,7 @@
         .ip-chip { display: inline-block; margin: 2px 4px 2px 0; font-family: monospace; font-size: 0.85rem; }
         .badge-online { background-color: rgba(166, 227, 161, 0.15); color: #a6e3a1; border: 1px solid #a6e3a1; }
         .badge-offline { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; }
-        .badge-Blocked { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
+        .badge-blocked { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
         .btn-withdraw { background-color: #a6e3a1; color: #11111b; font-weight: 600; border: none; }
         .btn-withdraw:hover { background-color: #94e2d5; color: #11111b; }
         .btn-withdraw-low { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; }
@@ -34,7 +34,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-flex align-items-center gap-2">
                     <img src="https://i.ibb.co.com/wZtz8N8D/EAIcon.png" onerror="this.src='/static/EAIcon.png'; this.onerror=null;" alt="Logo" style="width: 40px; height: 40px; object-fit: contain;">
-                    <h4 class="mb-0 fw-bold text-light">EarnApp Multi-Monitor</h4>
+                    <h4 class="mb-0 fw-bold text-light">EarnApp Multi Account Monitoring</h4>
                 </div>
 
                 <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -76,6 +76,11 @@
                     <button class="btn btn-primary btn-sm px-3" style="height: 38px; border-radius: 8px; display: inline-flex; align-items: center;" onclick="fetchStats()">
                         <span data-i18n="refresh">🔄 Refresh</span>
                     </button>
+
+                    <!-- TOMBOL LOGOUT -->
+                    <a href="/logout" class="btn btn-outline-danger btn-sm px-3 ms-1" style="height: 38px; border-radius: 8px; display: inline-flex; align-items: center;" title="Keluar">
+                        🚪
+                    </a>
                 </div>
             </div>
 
@@ -220,7 +225,7 @@
         let withdrawModalInstance = null;
         let refreshTimer = null;
         let T = i18n[currentLang];
-        window.appData = []; // Untuk menyimpan data Global agar bisa di-export CSV
+        window.appData = [];
 
         document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('langSelector').value = currentLang;
@@ -312,18 +317,13 @@
             } finally { submitBtn.innerHTML = `🚀 ${T.wdSubmit}`; }
         }
 
-        // ==========================================
-        // FITUR BARU: FILTER TABEL & EXPORT CSV
-        // ==========================================
         function filterNodes(accId, status) {
-            // Update warna tombol filter
             document.querySelectorAll(`.btn-filter-${accId}`).forEach(b => {
                 b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary');
             });
             document.getElementById(`btnFilter_${accId}_${status}`).classList.remove('btn-outline-secondary');
             document.getElementById(`btnFilter_${accId}_${status}`).classList.add('btn-primary');
             
-            // Filter Baris (Tr) tabel
             const rows = document.querySelectorAll(`.row-node-${accId}`);
             rows.forEach(row => {
                 if (status === 'all' || row.dataset.status === status) row.style.display = '';
@@ -360,8 +360,9 @@
         async function fetchStats() {
             try {
                 const response = await fetch('/api/stats');
+                if (response.status === 401) { window.location.href = '/login'; return; }
                 const data = await response.json();
-                window.appData = data.accounts; // Simpan data untuk Export CSV
+                window.appData = data.accounts;
 
                 document.getElementById('globalBalance').innerText = data.total_balance.toFixed(2);
                 document.getElementById('globalLifetime').innerText = data.total_lifetime.toFixed(2);
@@ -372,17 +373,16 @@
 
                 data.accounts.forEach(acc => {
                     if (acc.error) {
-                        html += `<div class="col-xl-6"><div class="card border-danger p-3"><h5>😿 ${acc.name}</h5><p class="text-danger mb-0">${T.txtErr} ${acc.error}</p></div></div>`;
+                        html += `<div class="col-12"><div class="card border-danger p-3"><h5>😿 ${acc.name}</h5><p class="text-danger mb-0">${T.txtErr} ${acc.error}</p></div></div>`;
                         return;
                     }
-                    const warnBadge = acc.Blocked_nodes > 0 ? `<span class="badge badge-Blocked ms-1">⚠️ ${acc.Blocked_nodes} Blocked</span>` : '';
+                    const warnBadge = acc.blocked_nodes > 0 ? `<span class="badge badge-blocked ms-1">⚠️ ${acc.blocked_nodes} Blocked</span>` : '';
                     const wdBtnClass = acc.balance >= 2.5 ? 'btn-withdraw' : 'btn-withdraw-low';
                     const safeName = acc.name.replace(/'/g, "\\'");
 
                     html += `
                     <div class="col-12">
                         <div class="card p-3 h-100">
-                            <!-- Header Akun -->
                             <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
                                 <div>
                                     <h5 class="mb-1 fw-bold text-info">🦊 ${acc.name}</h5>
@@ -397,17 +397,11 @@
                                         <div class="fs-4 fw-bold text-success">💰 $${acc.balance.toFixed(2)}</div>
                                         <small class="text-warning">${T.txtLifetime} $${acc.lifetime.toFixed(2)}</small>
                                     </div>
-                                    <!-- TOMBOL EXPORT CSV -->
-                                    <button onclick="exportCSV(${acc.id})" class="btn btn-sm btn-outline-info rounded-3 px-3 py-2 fw-bold" title="Export Data Node">
-                                        ${T.btnExport}
-                                    </button>
-                                    <button onclick="openWithdrawModal(${acc.id}, '${safeName}', ${acc.balance})" class="btn btn-sm ${wdBtnClass} rounded-3 px-3 py-2">
-                                        ${T.btnWd}
-                                    </button>
+                                    <button onclick="exportCSV(${acc.id})" class="btn btn-sm btn-outline-info rounded-3 px-3 py-2 fw-bold" title="Export Data Node">${T.btnExport}</button>
+                                    <button onclick="openWithdrawModal(${acc.id}, '${safeName}', ${acc.balance})" class="btn btn-sm ${wdBtnClass} rounded-3 px-3 py-2">${T.btnWd}</button>
                                 </div>
                             </div>
 
-                            <!-- 3 Kolom Grafik -->
                             <div class="row g-2 mb-2">
                                 <div class="col-md-4">
                                     <div class="chart-box">
@@ -429,18 +423,16 @@
                                 </div>
                             </div>
 
-                            <!-- Filter Cepat Node -->
                             <div class="d-flex flex-wrap justify-content-between align-items-end mb-2 mt-3">
                                 <div class="small fw-semibold text-light mb-1">${T.tblNode} List</div>
                                 <div class="btn-group btn-group-sm mb-1" role="group">
                                     <button id="btnFilter_${acc.id}_all" onclick="filterNodes(${acc.id}, 'all')" class="btn btn-primary btn-filter-${acc.id}">${T.filterAll}</button>
                                     <button id="btnFilter_${acc.id}_online" onclick="filterNodes(${acc.id}, 'online')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOnline}</button>
                                     <button id="btnFilter_${acc.id}_offline" onclick="filterNodes(${acc.id}, 'offline')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOffline}</button>
-                                    <button id="btnFilter_${acc.id}_Blocked" onclick="filterNodes(${acc.id}, 'Blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked}</button>
+                                    <button id="btnFilter_${acc.id}_blocked" onclick="filterNodes(${acc.id}, 'blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked}</button>
                                 </div>
                             </div>
 
-                            <!-- Tabel Node -->
                             <div class="table-container">
                                 <table class="table table-sm table-dark table-striped align-middle">
                                     <thead class="sticky-top" style="background-color: #11111b;">
@@ -458,7 +450,7 @@
                     acc.devices.forEach(dev => {
                         let statusBadge = '';
                         if (dev.status === 'online') statusBadge = `<span class="badge badge-online">🟢 ONLINE</span>`;
-                        else if (dev.status === 'Blocked') statusBadge = `<span class="badge badge-Blocked" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ IP BLOCKED</span>`;
+                        else if (dev.status === 'blocked') statusBadge = `<span class="badge badge-blocked" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ BLOCKED</span>`;
                         else statusBadge = `<span class="badge badge-offline">🔴 OFFLINE</span>`;
 
                         const ipHtml = dev.ips.length > 0 ? dev.ips.map(ip => `<span class="ip-chip">${ip}</span>`).join(' ') : '<span class="text-muted small">-</span>';
@@ -482,11 +474,9 @@
                 });
                 document.getElementById('dashboardContent').innerHTML = html;
 
-                // Render Chart.js
                 data.accounts.forEach(acc => {
                     if (acc.error) return;
                     
-                    // 1. Grafik Tren Global
                     const ctxGlobal = document.getElementById(`chartGlobal_${acc.id}`);
                     if (ctxGlobal) {
                         chartInstances[`global_${acc.id}`] = new Chart(ctxGlobal, {
@@ -496,7 +486,6 @@
                         });
                     }
                     
-                    // 2. Grafik Riwayat Saldo (Baru)
                     const ctxHist = document.getElementById(`chartHist_${acc.id}`);
                     if (ctxHist) {
                         chartInstances[`hist_${acc.id}`] = new Chart(ctxHist, {
@@ -506,7 +495,6 @@
                         });
                     }
 
-                    // 3. Grafik Top Node
                     const ctxTop = document.getElementById(`chartTop_${acc.id}`);
                     if (ctxTop) {
                         chartInstances[`top_${acc.id}`] = new Chart(ctxTop, {
