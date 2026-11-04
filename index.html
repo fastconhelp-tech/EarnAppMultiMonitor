@@ -17,7 +17,7 @@
         .ip-chip { display: inline-block; margin: 2px 4px 2px 0; font-family: monospace; font-size: 0.85rem; }
         .badge-online { background-color: rgba(166, 227, 161, 0.15); color: #a6e3a1; border: 1px solid #a6e3a1; }
         .badge-offline { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; }
-        .badge-banned { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
+        .badge-Blocked { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
         .btn-withdraw { background-color: #a6e3a1; color: #11111b; font-weight: 600; border: none; }
         .btn-withdraw:hover { background-color: #94e2d5; color: #11111b; }
         .btn-withdraw-low { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; }
@@ -194,7 +194,7 @@
                 tblNode: "🖥️ Node", tblCountry: "🌍 Negara", tblEarned: "💵 Earned", tblStatus: "📡 Status", txtTot: "Tot:", txtTotal: "Total:",
                 errEmailReq: "❌ Masukkan alamat email PayPal terlebih dahulu!", msgProcess: "⏳ Memproses...",
                 msgWdWait: "⏳ Menghubungi server EarnApp untuk pencairan...", errWdFail: "❌ Gagal menghubungi server aplikasi.",
-                filterAll: "Semua", filterOnline: "Online", filterOffline: "Offline", filterBanned: "Banned", btnExport: "📥 CSV"
+                filterAll: "Semua", filterOnline: "Online", filterOffline: "Offline", filterBlocked: "Blocked", btnExport: "📥 CSV"
             },
             en: {
                 totalBalance: "💰 Total Balance:", totalLifetime: "🏆 Total Lifetime:", globalNodes: "📡 Global Nodes:", manageAcc: "⚙️ Manage Accounts ({{ accounts|length }})",
@@ -211,7 +211,7 @@
                 tblNode: "🖥️ Node", tblCountry: "🌍 Country", tblEarned: "💵 Earned", tblStatus: "📡 Status", txtTot: "Tot:", txtTotal: "Total:",
                 errEmailReq: "❌ Please enter your PayPal email first!", msgProcess: "⏳ Processing...",
                 msgWdWait: "⏳ Contacting EarnApp server for withdrawal...", errWdFail: "❌ Failed to contact application server.",
-                filterAll: "All", filterOnline: "Online", filterOffline: "Offline", filterBanned: "Banned", btnExport: "📥 CSV"
+                filterAll: "All", filterOnline: "Online", filterOffline: "Offline", filterBlocked: "Blocked", btnExport: "📥 CSV"
             }
         };
 
@@ -375,7 +375,7 @@
                         html += `<div class="col-xl-6"><div class="card border-danger p-3"><h5>😿 ${acc.name}</h5><p class="text-danger mb-0">${T.txtErr} ${acc.error}</p></div></div>`;
                         return;
                     }
-                    const warnBadge = acc.banned_nodes > 0 ? `<span class="badge badge-banned ms-1">⚠️ ${acc.banned_nodes} Blocked</span>` : '';
+                    const warnBadge = acc.Blocked_nodes > 0 ? `<span class="badge badge-Blocked ms-1">⚠️ ${acc.Blocked_nodes} Blocked</span>` : '';
                     const wdBtnClass = acc.balance >= 2.5 ? 'btn-withdraw' : 'btn-withdraw-low';
                     const safeName = acc.name.replace(/'/g, "\\'");
 
@@ -436,7 +436,7 @@
                                     <button id="btnFilter_${acc.id}_all" onclick="filterNodes(${acc.id}, 'all')" class="btn btn-primary btn-filter-${acc.id}">${T.filterAll}</button>
                                     <button id="btnFilter_${acc.id}_online" onclick="filterNodes(${acc.id}, 'online')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOnline}</button>
                                     <button id="btnFilter_${acc.id}_offline" onclick="filterNodes(${acc.id}, 'offline')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOffline}</button>
-                                    <button id="btnFilter_${acc.id}_banned" onclick="filterNodes(${acc.id}, 'banned')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBanned}</button>
+                                    <button id="btnFilter_${acc.id}_Blocked" onclick="filterNodes(${acc.id}, 'Blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked}</button>
                                 </div>
                             </div>
 
@@ -458,7 +458,7 @@
                     acc.devices.forEach(dev => {
                         let statusBadge = '';
                         if (dev.status === 'online') statusBadge = `<span class="badge badge-online">🟢 ONLINE</span>`;
-                        else if (dev.status === 'banned') statusBadge = `<span class="badge badge-banned" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ IP BLOCKED</span>`;
+                        else if (dev.status === 'Blocked') statusBadge = `<span class="badge badge-Blocked" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ IP BLOCKED</span>`;
                         else statusBadge = `<span class="badge badge-offline">🔴 OFFLINE</span>`;
 
                         const ipHtml = dev.ips.length > 0 ? dev.ips.map(ip => `<span class="ip-chip">${ip}</span>`).join(' ') : '<span class="text-muted small">-</span>';
