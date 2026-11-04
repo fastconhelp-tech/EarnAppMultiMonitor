@@ -19,9 +19,9 @@ PORT="5000"
 # ==========================================
 clear_screen() { clear; }
 
+# Mengambil IP Lokal dari interface jaringan utama
 get_ip() { 
-    IP=$(wget -qO- ipv4.icanhazip.com 2>/dev/null)
-    echo "${IP:-$(hostname -I | awk '{print $1}')}"
+    hostname -I | awk '{print $1}'
 }
 
 check_service_status() { 
@@ -55,7 +55,6 @@ install_dashboard() {
     ./venv/bin/pip install flask requests gunicorn > /dev/null 2>&1
 
     echo -e "${YELLOW}⏳ [3/4] Mengunduh skrip dari GitHub...${NC}"
-    # Mengunduh app.py dan index.html langsung dari repositori Anda
     wget -qO app.py "https://raw.githubusercontent.com/fastconhelp-tech/EarnAppMultiMonitor/main/app.py"
     wget -qO templates/index.html "https://raw.githubusercontent.com/fastconhelp-tech/EarnAppMultiMonitor/main/index.html"
 
@@ -140,7 +139,7 @@ while true; do
     echo -e "${CYAN}======================================================${NC}"
     echo -e "${BOLD}    🌐 EARNAPP WEB DASHBOARD MANAGER 🌐${NC}"
     echo -e "${CYAN}======================================================${NC}"
-    echo -e " 🖥️  IP Publik     : ${YELLOW}$(get_ip)${NC}"
+    echo -e " 🖥️  IP Lokal      : ${YELLOW}$(get_ip)${NC}"
     echo -e " 🔌 Port Akses    : ${YELLOW}$PORT${NC}"
     echo -e " 📦 Status Install: $(check_installation)"
     echo -e " 🐝 Status Service: $(check_service_status)"
