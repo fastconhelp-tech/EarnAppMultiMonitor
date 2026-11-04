@@ -107,6 +107,39 @@ change_port() {
     read -p "Tekan Enter..."
 }
 
+change_credentials() {
+    clear_screen
+    echo -e "${CYAN}======================================================${NC}"
+    echo -e "${BOLD}🔐 UBAH USERNAME & PASSWORD LOGIN${NC}"
+    echo -e "${CYAN}======================================================${NC}"
+    
+    if [ ! -f "$APP_DIR/app.py" ]; then
+        echo -e "\n${RED}❌ Error: Dasbor belum terinstal. Silakan jalankan opsi 1 terlebih dahulu.${NC}"
+        read -p "Tekan Enter..."
+        return
+    fi
+    
+    echo -e "Kosongkan dan tekan Enter jika tidak ingin mengubah salah satunya.\n"
+    read -p "Masukkan Username Baru: " NEW_USER
+    read -p "Masukkan Password Baru: " NEW_PASS
+    
+    if [[ -n "$NEW_USER" ]]; then
+        sed -i "s/^ADMIN_USERNAME = .*/ADMIN_USERNAME = \"$NEW_USER\"/" $APP_DIR/app.py
+    fi
+    
+    if [[ -n "$NEW_PASS" ]]; then
+        sed -i "s/^ADMIN_PASSWORD = .*/ADMIN_PASSWORD = \"$NEW_PASS\"/" $APP_DIR/app.py
+    fi
+
+    if [[ -n "$NEW_USER" || -n "$NEW_PASS" ]]; then
+        systemctl restart $SERVICE_NAME
+        echo -e "\n${GREEN}✅ Kredensial berhasil diperbarui dan layanan telah direstart!${NC}"
+    else
+        echo -e "\n${YELLOW}⚠️ Tidak ada perubahan yang dilakukan.${NC}"
+    fi
+    read -p "Tekan Enter..."
+}
+
 uninstall_dashboard() {
     clear_screen
     echo -e "${CYAN}======================================================${NC}"
@@ -149,12 +182,13 @@ while true; do
     echo -e " 3. 🛑 Stop Service"
     echo -e " 4. 🔄 Restart Service"
     echo -e " 5. ⚙️ Ubah Port Akses"
-    echo -e " 6. 📊 Lihat Log Error (Live)"
-    echo -e " 7. 🗑️ Uninstall Total"
+    echo -e " 6. 🔐 Ubah Username & Password Login"
+    echo -e " 7. 📊 Lihat Log Error (Live)"
+    echo -e " 8. 🗑️ Uninstall Total"
     echo -e " 0. ❌ Keluar"
     echo -e "${CYAN}======================================================${NC}"
     
-    read -p " 👉 Pilih menu [0-7]: " menu_pilihan
+    read -p " 👉 Pilih menu [0-8]: " menu_pilihan
     
     case $menu_pilihan in
         1) install_dashboard ;;
@@ -162,8 +196,9 @@ while true; do
         3) systemctl stop $SERVICE_NAME; echo -e "${RED}Service Dihentikan!${NC}"; sleep 1 ;;
         4) systemctl restart $SERVICE_NAME; echo -e "${GREEN}Service Direstart!${NC}"; sleep 1 ;;
         5) change_port ;;
-        6) clear_screen; echo -e "${YELLOW}Tekan CTRL+C untuk keluar dari log.${NC}"; journalctl -u $SERVICE_NAME -f ;;
-        7) uninstall_dashboard ;;
+        6) change_credentials ;;
+        7) clear_screen; echo -e "${YELLOW}Tekan CTRL+C untuk keluar dari log.${NC}"; journalctl -u $SERVICE_NAME -f ;;
+        8) uninstall_dashboard ;;
         0) clear_screen; echo -e "${GREEN}👋 Sampai jumpa!${NC}"; exit 0 ;;
         *) echo -e "${RED}❌ Pilihan tidak valid!${NC}"; sleep 1 ;;
     esac
