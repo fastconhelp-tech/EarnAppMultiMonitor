@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EarnApp Multi Account Monitoring</title>
+    <title>EarnApp Multi-Account Monitoring</title>
     <link rel="icon" href="https://i.ibb.co.com/wZtz8N8D/EAIcon.png" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -12,12 +12,12 @@
         .card { background-color: #1e1e2e; border: 1px solid #313244; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.25); }
         .stat-pill { background-color: #313244; border-radius: 8px; height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; }
         .chart-box { background-color: #181825; border: 1px solid #313244; border-radius: 12px; padding: 12px; height: 220px; position: relative; }
-        .table-container { max-height: 340px; overflow-y: auto; border-radius: 10px; border: 1px solid #313244; }
+        .table-container { max-height: 360px; overflow-y: auto; border-radius: 10px; border: 1px solid #313244; }
         .table-dark { --bs-table-bg: #181825; --bs-table-striped-bg: #1e1e2e; margin-bottom: 0; }
         .ip-chip { display: inline-block; margin: 2px 4px 2px 0; font-family: monospace; font-size: 0.85rem; }
         .badge-online { background-color: rgba(166, 227, 161, 0.15); color: #a6e3a1; border: 1px solid #a6e3a1; }
         .badge-offline { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; }
-        .badge-blocked { background-color: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid #f38ba8; font-weight: bold;}
+        .badge-blocked { background-color: rgba(250, 179, 135, 0.18); color: #fab387; border: 1px solid #fab387; font-weight: bold; }
         .btn-withdraw { background-color: #a6e3a1; color: #11111b; font-weight: 600; border: none; }
         .btn-withdraw:hover { background-color: #94e2d5; color: #11111b; }
         .btn-withdraw-low { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; }
@@ -29,12 +29,11 @@
 </head>
 <body class="p-3 p-md-4">
     <div class="container-fluid">
-        <!-- HEADER UTAMA -->
         <div class="card p-3 mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-flex align-items-center gap-2">
                     <img src="https://i.ibb.co.com/wZtz8N8D/EAIcon.png" onerror="this.src='/static/EAIcon.png'; this.onerror=null;" alt="Logo" style="width: 40px; height: 40px; object-fit: contain;">
-                    <h4 class="mb-0 fw-bold text-light">EarnApp Multi Account Monitoring</h4>
+                    <h4 class="mb-0 fw-bold text-light">EarnApp Multi-Account Monitoring</h4>
                 </div>
 
                 <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -77,14 +76,12 @@
                         <span data-i18n="refresh">🔄 Refresh</span>
                     </button>
 
-                    <!-- TOMBOL LOGOUT -->
                     <a href="/logout" class="btn btn-outline-danger btn-sm px-3 ms-1" style="height: 38px; border-radius: 8px; display: inline-flex; align-items: center;" title="Keluar">
                         🚪
                     </a>
                 </div>
             </div>
 
-            <!-- MENU KELOLA AKUN -->
             <div class="collapse mt-3 pt-3 border-top border-secondary" id="accountManager">
                 <div class="row g-3">
                     <div class="col-md-5">
@@ -122,7 +119,6 @@
             </div>
         </div>
 
-        <!-- KONTEN DASHBOARD PER AKUN -->
         <div id="dashboardContent" class="row g-4">
             <div class="col-12 text-center py-5">
                 <div class="spinner-border text-info mb-2" role="status"></div>
@@ -131,7 +127,6 @@
         </div>
     </div>
 
-    <!-- MODAL WITHDRAW -->
     <div class="modal fade" id="withdrawModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="background-color: #1e1e2e; border: 1px solid #45475a; border-radius: 14px;">
@@ -335,10 +330,10 @@
             const acc = window.appData.find(a => a.id === accId);
             if (!acc) return;
             
-            let csv = 'Node Name,Country,IP Address,Usage (Current),Total Usage,Earned (Current $),Total Earned ($),Status\n';
+            let csv = 'Node Name,Country,IP Address,Usage (Current),Total Usage,Earned (Current \$),Total Earned (\$),Status,Reason\n';
             acc.devices.forEach(d => {
                 const ips = d.ips.join(' | ');
-                csv += `"${d.name}","${d.country}","${ips}","${d.uptime}","${d.total_uptime}","${d.earned}","${d.earned_total}","${d.status.toUpperCase()}"\n`;
+                csv += `"${d.name}","${d.country}","${ips}","${d.uptime}","${d.total_uptime}","${d.earned}","${d.earned_total}","${d.status.toUpperCase()}","${d.error_reason || ''}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -429,7 +424,7 @@
                                     <button id="btnFilter_${acc.id}_all" onclick="filterNodes(${acc.id}, 'all')" class="btn btn-primary btn-filter-${acc.id}">${T.filterAll}</button>
                                     <button id="btnFilter_${acc.id}_online" onclick="filterNodes(${acc.id}, 'online')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOnline}</button>
                                     <button id="btnFilter_${acc.id}_offline" onclick="filterNodes(${acc.id}, 'offline')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterOffline}</button>
-                                    <button id="btnFilter_${acc.id}_blocked" onclick="filterNodes(${acc.id}, 'blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked}</button>
+                                    <button id="btnFilter_${acc.id}_blocked" onclick="filterNodes(${acc.id}, 'blocked')" class="btn btn-outline-secondary btn-filter-${acc.id}">${T.filterBlocked} (${acc.blocked_nodes})</button>
                                 </div>
                             </div>
 
@@ -449,9 +444,14 @@
 
                     acc.devices.forEach(dev => {
                         let statusBadge = '';
-                        if (dev.status === 'online') statusBadge = `<span class="badge badge-online">🟢 ONLINE</span>`;
-                        else if (dev.status === 'blocked') statusBadge = `<span class="badge badge-blocked" title="${dev.error_reason ? dev.error_reason : 'IP Blocked'}">⚠️ BLOCKED</span>`;
-                        else statusBadge = `<span class="badge badge-offline">🔴 OFFLINE</span>`;
+                        if (dev.status === 'online') {
+                            statusBadge = `<span class="badge badge-online">🟢 ONLINE</span>`;
+                        } else if (dev.status === 'blocked') {
+                            const reasonLabel = dev.error_reason ? `<small class="text-warning d-block mt-1" style="font-size:0.7rem;">${dev.error_reason}</small>` : '';
+                            statusBadge = `<span class="badge badge-blocked" title="${dev.error_reason || 'IP Blocked'}">⚠️ BLOCKED</span>${reasonLabel}`;
+                        } else {
+                            statusBadge = `<span class="badge badge-offline">🔴 OFFLINE</span>`;
+                        }
 
                         const ipHtml = dev.ips.length > 0 ? dev.ips.map(ip => `<span class="ip-chip">${ip}</span>`).join(' ') : '<span class="text-muted small">-</span>';
                         html += `
@@ -490,23 +490,4 @@
                     if (ctxHist) {
                         chartInstances[`hist_${acc.id}`] = new Chart(ctxHist, {
                             type: 'line',
-                            data: { labels: acc.chart_history.labels, datasets: [{ label: 'Balance ($)', data: acc.chart_history.values, borderColor: '#f9e2af', backgroundColor: 'rgba(249, 226, 175, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }] },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, layout: { padding: { bottom: 18 } }, scales: { x: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' } }, y: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' }, beginAtZero: false } } }
-                        });
-                    }
-
-                    const ctxTop = document.getElementById(`chartTop_${acc.id}`);
-                    if (ctxTop) {
-                        chartInstances[`top_${acc.id}`] = new Chart(ctxTop, {
-                            type: 'bar',
-                            data: { labels: acc.chart_top.labels, datasets: [{ label: T.chartHours, data: acc.chart_top.values, backgroundColor: '#89b4fa', borderRadius: 4 }] },
-                            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, layout: { padding: { bottom: 18, right: 10 } }, scales: { x: { ticks: { color: '#a6adc8', font: { size: 10 } }, grid: { color: '#313244' }, beginAtZero: true }, y: { ticks: { color: '#cdd6f4', font: { size: 10 } }, grid: { display: false } } } }
-                        });
-                    }
-                });
-            } catch (error) { console.error('Error fetching stats:', error); }
-        }
-        fetchStats();
-    </script>
-</body>
-</html>
+                            data
