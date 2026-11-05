@@ -186,6 +186,8 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('langSelector').value = currentLang;
+            const savedInterval = localStorage.getItem('earnapp_refresh_interval');
+            if (savedInterval !== null) document.getElementById('refreshInterval').value = savedInterval;
             applyTranslations();
             withdrawModalInstance = new bootstrap.Modal(document.getElementById('withdrawModal'));
             const savedEmail = localStorage.getItem('earnapp_paypal_email');
@@ -215,7 +217,10 @@
             if (lt) lt.innerText = T.loadingText;
         }
 
-        function updateRefreshInterval() { startRefreshTimer(); }
+        function updateRefreshInterval() {
+            localStorage.setItem('earnapp_refresh_interval', document.getElementById('refreshInterval').value);
+            startRefreshTimer();
+        }
         function startRefreshTimer() {
             if (refreshTimer) clearInterval(refreshTimer);
             const v = parseInt(document.getElementById('refreshInterval').value);
